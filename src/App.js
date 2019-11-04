@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
-import styled from "styled-components";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { AllWarCards } from "./AllWarCards";
 import { GlobalStyle } from "./GlobalStyles";
 import { cardValue } from "./cardValue";
 import { splitDeck } from "./splitDeck";
 import { DrawnCard } from "./DrawnCard";
-import { Modal } from "./Modal";
-import { WarCards } from "./WarCards";
+import { WarModal } from "./WarModal";
+import { EndGameModal } from "./EndGameModal";
 import { Button } from "./Button";
+import { Instructions } from "./Instructions";
 import firebase from "./firebaseConfig";
 import axios from "axios";
 
@@ -14,28 +15,42 @@ import axios from "axios";
 free: company branding, no url changes, no access to analytics, storage limit
 paid: remove company branding, unlimited url changes, analytics, storage limit increased
 */
+//add actions to end game if 0 cards left after war end
 
 function App() {
+  const buttonRef = useRef(null);
   const [id, setID] = useState("");
   const [cardsLeft, setCardsLeft] = useState({ user: "", cpu: "" });
   const [cardDrawn, setCardDrawn] = useState({ user: "", cpu: "" });
   const [warCardArrays, setWarCardArrays] = useState({ user: [], cpu: [] });
   const [userDoc, setUserDoc] = useState("");
   const [loggedIn, isLoggedIn] = useState(null);
-  const [gameUnderway, gameIsUnderway] = useState(false);
-
+  const [gameStart, triggerGameStart] = useState(false);
+  const [buttonFocus, setButtonFocus] = useState(false);
   const [drawDisabled, setDrawDisabled] = useState(false);
-  const [showModal, doShowModal] = useState(false);
+  const [showModal, doShowModal] = useState({
+    warModal: false,
+    endGameModal: false
+  });
+  const [result, setResult] = useState("");
   const [startAnimation, doStartAnimation] = useState({
     userWon: false,
     cpuWon: false
   });
+  const [widthOver1000] = useState(window.innerWidth > 1000);
   const apiStart = `https://deckofcardsapi.com/api/deck`;
+  const errorMessage =
+    "There's been an error. Please refresh the page or try again later.";
+
+  useLayoutEffect(() => {
+    if (widthOver1000 && document.getElementById("DrawButton")) {
+      buttonRef.current.focus();
+    }
+  }, [buttonFocus, widthOver1000]);
 
   useEffect(() => {
     firebase.auth().onAuthStateChanged(user => {
       if (user) {
-        console.log(user.uid);
         setUserDoc(
           firebase
             .firestore()
@@ -45,29 +60,33 @@ function App() {
         isLoggedIn(true);
       } else {
         isLoggedIn(false);
-        console.log("not signed in");
       }
     });
   }, []);
 
+  const focusOnButton = () => {
+    widthOver1000 && setButtonFocus(!buttonFocus);
+  };
+
   const user_pile = "user_pile";
   const cpu_pile = "cpu_pile";
 
-  const ModalOpenAndClose = () => {
-    doShowModal(true);
+  const showWarModal = () => {
+    doShowModal({ ...showModal, warModal: true });
     setTimeout(() => {
-      doShowModal(false);
-    }, 900);
+      doShowModal({ ...showModal, warModal: false });
+    }, 1100);
   };
 
   const restartGame = () => {
-    userDoc.delete();
+    userDoc.delete().catch(() => alert(errorMessage));
+    setDrawDisabled(false);
     setWarCardArrays({ user: [], cpu: [] });
     setCardDrawn({ user: "", cpu: "" });
-    doStartAnimation({
-      userWon: false,
-      cpuWon: false
-    });
+    setTimeout(() => {
+      onGameStartTwo();
+      doShowModal({ ...showModal, endGameModal: false });
+    }, 100);
   };
 
   const logUserIn = () => {
@@ -76,11 +95,24 @@ function App() {
         .auth()
         .signInAnonymously()
         .catch(() => {
-          return alert(
-            "There's been an error. Please refresh the page or try again later."
-          );
+          return alert(errorMessage);
         });
     }
+  };
+
+  const endOfGame = resultText => {
+    doShowModal({ ...showModal, endGameModal: true });
+    setResult(resultText);
+  };
+
+  const afterWinActions = (warWin = false) => {
+    setTimeout(() => {
+      setCardDrawn({ user: "", cpu: "" });
+      doStartAnimation({ userWon: false, cpuWon: false });
+      setDrawDisabled(false);
+      focusOnButton();
+      warWin && setWarCardArrays({ user: [], cpu: [] });
+    }, 310);
   };
 
   const onGameStartTwo = () => {
@@ -109,15 +141,14 @@ function App() {
               `${apiStart}/${deck_id}/pile/${cpu_pile}/add/?cards=${cpuStartingDeck}`
             )
           ]);
-          //   console.log(res.data);
-          // let pilesData = res.data.piles;
-          gameIsUnderway(true);
 
           setCardsLeft({
             user: user_deck.data.piles.user_pile.remaining,
             cpu: cpu_deck.data.piles.cpu_pile.remaining
           });
           setDrawDisabled(false);
+
+          focusOnButton();
         } catch (err) {
           alert(err);
         }
@@ -130,16 +161,14 @@ function App() {
 
   //draw from bottom
   const onDrawTwo = async () => {
+    triggerGameStart(true);
     setDrawDisabled(true);
     try {
+      let drawCard = "draw/bottom/?count=1";
       const [userDraw, cpuDraw] = await Promise.all([
-        axios.get(`${apiStart}/${id}/pile/${user_pile}/draw/bottom/?count=1`),
-        axios.get(`${apiStart}/${id}/pile/${cpu_pile}/draw/bottom/?count=1`)
+        axios.get(`${apiStart}/${id}/pile/${user_pile}/${drawCard}`),
+        axios.get(`${apiStart}/${id}/pile/${cpu_pile}/${drawCard}`)
       ]);
-
-      setTimeout(() => {
-        doStartAnimation({ userWon: false, cpuWon: false });
-      }, 300);
 
       let userCards = userDraw.data.cards[0];
       let cpuCards = cpuDraw.data.cards[0];
@@ -170,20 +199,18 @@ function App() {
         if (cardValue(userCards.value) === cardValue(cpuCards.value)) {
           //firstwar
           if (userCardsRemaining < 2) {
-            return alert("You lost!");
+            return endOfGame("lose");
           } else if (cpuCardsRemaining < 2) {
-            return alert("You win!");
+            return endOfGame("win");
           }
-
-          ModalOpenAndClose();
+          showWarModal();
           const warDraw = () => {
             setTimeout(async () => {
               try {
+                let drawTwo = "draw/?count=2";
                 const [userWarDraw, cpuWarDraw] = await Promise.all([
-                  axios.get(
-                    `${apiStart}/${id}/pile/${user_pile}/draw/?count=2`
-                  ),
-                  axios.get(`${apiStart}/${id}/pile/${cpu_pile}/draw/?count=2`)
+                  axios.get(`${apiStart}/${id}/pile/${user_pile}/${drawTwo}`),
+                  axios.get(`${apiStart}/${id}/pile/${cpu_pile}/${drawTwo}`)
                 ]);
 
                 let warAgainUserRemaining =
@@ -243,7 +270,7 @@ function App() {
 
                 const doc = await userDoc.get();
                 const { cpuWarCards, userWarCards } = doc.data();
-                console.log(cpuWarCards, userWarCards);
+
                 setWarCardArrays({ user: userWarCards, cpu: cpuWarCards });
 
                 let cpuCodesArr = [];
@@ -268,19 +295,17 @@ function App() {
                     cardValue(cpuSecondCard.value)
                   ) {
                     if (warAgainUserRemaining < 2) {
-                      return alert("You Lost");
+                      return endOfGame("lose");
                     } else if (warAgainCpuRemaining < 2) {
-                      return alert("You Won");
+                      return endOfGame("win");
                     }
-
-                    ModalOpenAndClose();
+                    showWarModal();
                     warDraw();
                   } else if (
                     cardValue(userSecondCard.value) >
                     cardValue(cpuSecondCard.value)
                   ) {
                     //send cards to user
-                    console.log("user wins war");
 
                     const userWin = async () => {
                       setWarCardArrays({
@@ -297,11 +322,8 @@ function App() {
                             cpu: cpuWarDraw.data.piles.cpu_pile.remaining
                           });
                           doStartAnimation({ userWon: true, cpuWon: false });
-                          userDoc.delete().then(() => console.log("deleted"));
-                          setTimeout(() => {
-                            setDrawDisabled(false);
-                            setWarCardArrays({ user: [], cpu: [] });
-                          }, 310);
+                          userDoc.delete().catch(() => alert(errorMessage));
+                          afterWinActions(true);
                         }, 2000);
                       } catch (err) {
                         alert(err);
@@ -315,7 +337,6 @@ function App() {
                     cardValue(userSecondCard.value) <
                     cardValue(cpuSecondCard.value)
                   ) {
-                    console.log("cpu wins war");
                     //send cards to cpu
 
                     const cpuWin = async () => {
@@ -333,12 +354,8 @@ function App() {
                             user: userWarDraw.data.piles.user_pile.remaining
                           });
                           doStartAnimation({ userWon: false, cpuWon: true });
-
-                          userDoc.delete().then(() => console.log("deleted"));
-                          setTimeout(() => {
-                            setDrawDisabled(false);
-                            setWarCardArrays({ user: [], cpu: [] });
-                          }, 310);
+                          userDoc.delete().catch(() => alert(errorMessage));
+                          afterWinActions(true);
                         }, 2000);
                       } catch (err) {
                         alert(err);
@@ -352,12 +369,12 @@ function App() {
               } catch (err) {
                 alert(err);
               }
-            }, 800);
+            }, 1000);
           };
 
           warDraw();
         } else if (cardValue(userCards.value) > cardValue(cpuCards.value)) {
-          console.log("user card greater");
+          //user card greater
           (async () => {
             try {
               const res = await axios.get(
@@ -366,21 +383,19 @@ function App() {
               doStartAnimation({ userWon: true, cpuWon: false });
               setCardsLeft({
                 user: res.data.piles.user_pile.remaining,
-                cpu: cpuDraw.data.piles.cpu_pile.remaining
+                cpu: cpuCardsRemaining
               });
 
+              afterWinActions();
               setTimeout(() => {
-                console.log("inline cleanup");
-                setDrawDisabled(false);
-              }, 310);
-              if (cpuDraw.data.piles.cpu_pile.remaining < 1)
-                return alert("You Win!");
+                if (cpuCardsRemaining < 1) return endOfGame("win");
+              }, 320);
             } catch (err) {
               alert(err);
             }
           })();
         } else if (cardValue(userCards.value) < cardValue(cpuCards.value)) {
-          console.log("cpu card greater");
+          //cpu card greater
           (async () => {
             try {
               const res = await axios.get(
@@ -388,84 +403,75 @@ function App() {
               );
               doStartAnimation({ userWon: false, cpuWon: true });
               setCardsLeft({
-                user: userDraw.data.piles.user_pile.remaining,
+                user: userCardsRemaining,
                 cpu: res.data.piles.cpu_pile.remaining
               });
+              afterWinActions();
               setTimeout(() => {
-                console.log("inline cleanup");
-                setDrawDisabled(false);
-              }, 310);
-              if (userDraw.data.piles.user_pile.remaining < 1)
-                return alert("You Lose!");
+                if (userCardsRemaining < 1) return endOfGame("lose");
+              }, 320);
             } catch (err) {
               alert(err);
             }
           })();
         }
-      }, 1500);
+      }, 1600);
     } catch (err) {
       alert(err);
     }
   };
-
-  const showGameVals = () =>
-    gameUnderway && loggedIn && cardsLeft.user !== "" && cardsLeft.cpu !== "";
-
-  const loggedInStatusSet = () =>
-    (loggedIn === true || loggedIn === false) && !gameUnderway;
-
+  const showGameVals = () => loggedIn && cardsLeft.user && cardsLeft.cpu;
+  const decksSet = () => !!cardsLeft.user || !!cardsLeft.cpu;
   return (
     <>
       <GlobalStyle />
-      <div>
-        <Modal startAnimation={showModal} text="WAR" />
-        {loggedInStatusSet() && <Button onClick={onGameStartTwo}>Start</Button>}
-        {loggedIn === null && <h1>Initializing...</h1>}
 
-        {showGameVals() && (
-          <>
-            {<p>Deck: {cardsLeft.cpu}</p>}
-            <h2>CPU</h2>
+      {decksSet() || <Instructions onStart={onGameStartTwo} />}
+      {showGameVals() && (
+        <>
+          <p>Deck: {cardsLeft.cpu}</p>
+          <h2>CPU</h2>
+          <DrawnCard
+            showCard={cardDrawn.cpu}
+            src={cardDrawn.cpu.image}
+            alt={`${cardDrawn.cpu.value} of ${cardDrawn.cpu.suit}`}
+            cpuWonAnimation={startAnimation.cpuWon}
+            userWonAnimation={startAnimation.userWon}
+          />
+          <AllWarCards
+            startAnimation={startAnimation}
+            warCardArrays={warCardArrays}
+          />
 
-            <DrawnCard
-              showCard={cardDrawn.cpu}
-              src={cardDrawn.cpu.image}
-              alt={`${cardDrawn.cpu.value} of ${cardDrawn.cpu.suit}`}
-              cpuWonAnimation={startAnimation.cpuWon}
-              userWonAnimation={startAnimation.userWon}
-            />
-            <br />
-            <WarCards
-              array={warCardArrays.cpu}
-              cpuWonAnimation={startAnimation.cpuWon}
-              userWonAnimation={startAnimation.userWon}
-            />
-            <br />
-            <br />
-            <br />
-            <WarCards
-              array={warCardArrays.user}
-              cpuWonAnimation={startAnimation.cpuWon}
-              userWonAnimation={startAnimation.userWon}
-            />
-            <br />
-            <DrawnCard
-              showCard={cardDrawn.user}
-              src={cardDrawn.user.image}
-              alt={`${cardDrawn.user.value} of ${cardDrawn.user.suit}`}
-              cpuWonAnimation={startAnimation.cpuWon}
-              userWonAnimation={startAnimation.userWon}
-            />
+          <DrawnCard
+            showCard={cardDrawn.user}
+            src={cardDrawn.user.image}
+            alt={`${cardDrawn.user.value} of ${cardDrawn.user.suit}`}
+            cpuWonAnimation={startAnimation.cpuWon}
+            userWonAnimation={startAnimation.userWon}
+          />
+          <h2>You</h2>
+          <p>Deck: {cardsLeft.user}</p>
+          <Button
+            disabled={drawDisabled}
+            id="DrawButton"
+            onClick={onDrawTwo}
+            ref={buttonRef}
+          >
+            Draw
+          </Button>
 
-            <h2>You</h2>
-            {<p>Deck: {cardsLeft.user}</p>}
-
-            <Button disabled={drawDisabled} onClick={onDrawTwo}>
-              Draw
-            </Button>
-          </>
-        )}
-      </div>
+          {!gameStart && widthOver1000 && (
+            <p>Click or Press "Enter" / "Space" to draw</p>
+          )}
+        </>
+      )}
+      <WarModal startAnimation={showModal.warModal} />
+      <EndGameModal
+        startAnimation={showModal.endGameModal}
+        gameResult={result}
+        onGameRestart={restartGame}
+      />
     </>
   );
 }

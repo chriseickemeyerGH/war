@@ -12,19 +12,22 @@ transform: scale(1)
 
 const ModalBox = styled.div`
   top: 30%;
+  box-sizing: border-box;
+  padding: 10px 10px 20px 10px;
   position: fixed;
   left: 50%;
-  margin-left: -150px;
+  margin-left: -125px;
   border-radius: 10px;
-  width: 300px;
+  width: 250px;
   color: #1f2227;
-
   background-color: lavender;
+  flex-flow: column;
+  align-items: center;
   ${props =>
     props.startAnimation
       ? css`
           animation-name: ${Grow};
-          display: block;
+          display: flex;
           animation-duration: 0.2s;
           animation-iteration-count: 1;
           animation-fill-mode: forwards;
@@ -35,8 +38,6 @@ const ModalBox = styled.div`
         `}
 `;
 
-export const Modal = ({ startAnimation, text }) => (
-  <ModalBox startAnimation={startAnimation}>
-    <h1>{text}</h1>
-  </ModalBox>
+export const Modal = ({ startAnimation, children }) => (
+  <ModalBox startAnimation={startAnimation}>{children}</ModalBox>
 );

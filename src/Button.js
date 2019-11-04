@@ -1,7 +1,8 @@
 import React from "react";
 import styled from "styled-components";
 const StyledButton = styled.button`
-  font-size: 16px;
+  font-size: 18px;
+  font-family: "Nirmala UI";
   border: 1px solid lavender;
   padding: 16px;
   background-color: transparent;
@@ -20,4 +21,7 @@ const StyledButton = styled.button`
     color: #1f2227;
   }
 `;
-export const Button = ({ ...props }) => <StyledButton {...props} />;
+
+export const Button = React.forwardRef(({ ...props }, ref) => (
+  <StyledButton ref={ref} {...props} />
+));
