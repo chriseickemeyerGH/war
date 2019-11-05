@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { AllWarCards } from "./AllWarCards";
+import { AllCards } from "./AllCards";
 import { GlobalStyle } from "./GlobalStyles";
 import { cardValue } from "./cardValue";
 import { splitDeck } from "./splitDeck";
-import { DrawnCard } from "./DrawnCard";
 import { WarModal } from "./WarModal";
 import { EndGameModal } from "./EndGameModal";
 import { Button } from "./Button";
@@ -11,20 +10,16 @@ import { Instructions } from "./Instructions";
 import firebase from "./firebaseConfig";
 import axios from "axios";
 
-/*
-free: company branding, no url changes, no access to analytics, storage limit
-paid: remove company branding, unlimited url changes, analytics, storage limit increased
-*/
 //add actions to end game if 0 cards left after war end
 
 function App() {
   const buttonRef = useRef(null);
   const [id, setID] = useState("");
-  const [cardsLeft, setCardsLeft] = useState({ user: "", cpu: "" });
+  const [cardsLeft, setCardsLeft] = useState({ user: null, cpu: null });
   const [cardDrawn, setCardDrawn] = useState({ user: "", cpu: "" });
   const [warCardArrays, setWarCardArrays] = useState({ user: [], cpu: [] });
   const [userDoc, setUserDoc] = useState("");
-  const [loggedIn, isLoggedIn] = useState(null);
+  const [loggedIn, isLoggedIn] = useState(false);
   const [gameStart, triggerGameStart] = useState(false);
   const [buttonFocus, setButtonFocus] = useState(false);
   const [drawDisabled, setDrawDisabled] = useState(false);
@@ -37,10 +32,14 @@ function App() {
     userWon: false,
     cpuWon: false
   });
-  const [widthOver1000] = useState(window.innerWidth > 1000);
+
+  const [loading, isLoading] = useState(false);
   const apiStart = `https://deckofcardsapi.com/api/deck`;
   const errorMessage =
     "There's been an error. Please refresh the page or try again later.";
+  const winningMessage = "win";
+  const losingMessage = "lose";
+  const widthOver1000 = window.innerWidth > 1000;
 
   useLayoutEffect(() => {
     if (widthOver1000 && document.getElementById("DrawButton")) {
@@ -71,56 +70,82 @@ function App() {
   const user_pile = "user_pile";
   const cpu_pile = "cpu_pile";
 
-  const showWarModal = () => {
+  const restartGame = () => {
+    userDoc.delete().catch(() => alert(errorMessage));
+    setWarCardArrays({ user: [], cpu: [] });
+    setCardDrawn({ user: "", cpu: "" });
+    onGameStartTwo();
+    doShowModal({ ...showModal, endGameModal: false });
+  };
+
+  const onStartGame = () => {
+    if (!loggedIn) {
+      isLoading(true);
+      firebase
+        .auth()
+        .signInAnonymously()
+        .then(() => {
+          isLoading(false);
+          onGameStartTwo();
+        })
+        .catch(() => {
+          return alert(errorMessage);
+        });
+    } else if (loggedIn) {
+      onGameStartTwo();
+    }
+  };
+
+  const afterWinActions = (warWin, numberCardsLeft, resultText) => {
+    setTimeout(() => {
+      userDoc.delete().catch(() => alert(errorMessage));
+      setCardDrawn({ user: "", cpu: "" });
+      doStartAnimation({ userWon: false, cpuWon: false });
+      //   setDrawDisabled(false);
+      warWin && setWarCardArrays({ user: [], cpu: [] });
+      //   focusOnButton();
+      if (numberCardsLeft < 1) {
+        return [
+          doShowModal({ ...showModal, endGameModal: true }),
+          setResult(resultText)
+        ];
+      } else {
+        setDrawDisabled(false);
+        let t = true;
+        t && focusOnButton();
+      }
+    }, 310);
+  };
+
+  const warActions = (user_cards_left, cpu_cards_left, warCardsFn) => {
     doShowModal({ ...showModal, warModal: true });
     setTimeout(() => {
       doShowModal({ ...showModal, warModal: false });
     }, 1100);
-  };
-
-  const restartGame = () => {
-    userDoc.delete().catch(() => alert(errorMessage));
-    setDrawDisabled(false);
-    setWarCardArrays({ user: [], cpu: [] });
-    setCardDrawn({ user: "", cpu: "" });
     setTimeout(() => {
-      onGameStartTwo();
-      doShowModal({ ...showModal, endGameModal: false });
-    }, 100);
-  };
-
-  const logUserIn = () => {
-    if (!loggedIn) {
-      firebase
-        .auth()
-        .signInAnonymously()
-        .catch(() => {
-          return alert(errorMessage);
-        });
-    }
-  };
-
-  const endOfGame = resultText => {
-    doShowModal({ ...showModal, endGameModal: true });
-    setResult(resultText);
-  };
-
-  const afterWinActions = (warWin = false) => {
-    setTimeout(() => {
-      setCardDrawn({ user: "", cpu: "" });
-      doStartAnimation({ userWon: false, cpuWon: false });
-      setDrawDisabled(false);
-      focusOnButton();
-      warWin && setWarCardArrays({ user: [], cpu: [] });
-    }, 310);
+      if (user_cards_left < 2) {
+        return [
+          doShowModal({ warModal: false, endGameModal: true }),
+          setResult(losingMessage)
+        ];
+      } else if (cpu_cards_left < 2) {
+        return [
+          doShowModal({ warModal: false, endGameModal: true }),
+          setResult(winningMessage)
+        ];
+      } else {
+        setTimeout(() => {
+          warCardsFn();
+        }, 500);
+      }
+    }, 1200);
   };
 
   const onGameStartTwo = () => {
-    logUserIn();
+    //  logUserIn();
     const createDecks = async () => {
       try {
         const res = await axios.get(`${apiStart}/new/draw/?count=52`);
-
         /* draw all cards from new deck */
         let deck_id = res.data.deck_id;
         setID(deck_id);
@@ -129,8 +154,6 @@ function App() {
         cards.map(item => arr.push(item.code));
         let userStartingDeck = splitDeck(arr, 0, 26);
         let cpuStartingDeck = splitDeck(arr, 26, 52);
-
-        /* create two 26 card piles for deck  */
 
         try {
           const [user_deck, cpu_deck] = await Promise.all([
@@ -174,6 +197,7 @@ function App() {
       let cpuCards = cpuDraw.data.cards[0];
       let userCardsRemaining = userDraw.data.piles.user_pile.remaining;
       let cpuCardsRemaining = cpuDraw.data.piles.cpu_pile.remaining;
+
       setCardsLeft({
         user: userCardsRemaining,
         cpu: cpuCardsRemaining
@@ -190,189 +214,185 @@ function App() {
           suit: cpuCards.suit
         }
       });
-
       let bothCardCodes = `${userCards.code},${cpuCards.code}`;
-
-      //add to deck
 
       setTimeout(() => {
         if (cardValue(userCards.value) === cardValue(cpuCards.value)) {
           //firstwar
-          if (userCardsRemaining < 2) {
-            return endOfGame("lose");
-          } else if (cpuCardsRemaining < 2) {
-            return endOfGame("win");
-          }
-          showWarModal();
-          const warDraw = () => {
-            setTimeout(async () => {
-              try {
-                let drawTwo = "draw/?count=2";
-                const [userWarDraw, cpuWarDraw] = await Promise.all([
-                  axios.get(`${apiStart}/${id}/pile/${user_pile}/${drawTwo}`),
-                  axios.get(`${apiStart}/${id}/pile/${cpu_pile}/${drawTwo}`)
-                ]);
+          const warDraw = async () => {
+            try {
+              let drawTwo = "draw/bottom/?count=2";
+              const [userWarDraw, cpuWarDraw] = await Promise.all([
+                axios.get(`${apiStart}/${id}/pile/${user_pile}/${drawTwo}`),
+                axios.get(`${apiStart}/${id}/pile/${cpu_pile}/${drawTwo}`)
+              ]);
+              let userData = userWarDraw.data;
+              let cpuData = cpuWarDraw.data;
+              let warAgainUserRemaining = userData.piles.user_pile.remaining;
+              let warAgainCpuRemaining = cpuData.piles.cpu_pile.remaining;
+              setCardsLeft({
+                user: warAgainUserRemaining,
+                cpu: warAgainCpuRemaining
+              });
+              const drawnCards = (fnData, num) => fnData.cards[num];
+              let userFirstCard = drawnCards(userData, 0);
+              let userSecondCard = drawnCards(userData, 1);
+              let cpuFirstCard = drawnCards(cpuData, 0);
+              let cpuSecondCard = drawnCards(cpuData, 1);
 
-                let warAgainUserRemaining =
-                  userWarDraw.data.piles.user_pile.remaining;
-                let warAgainCpuRemaining =
-                  cpuWarDraw.data.piles.cpu_pile.remaining;
-                let userFirstCard = userWarDraw.data.cards[0];
-                let userSecondCard = userWarDraw.data.cards[1];
-                let cpuFirstCard = cpuWarDraw.data.cards[0];
-                let cpuSecondCard = cpuWarDraw.data.cards[1];
+              let a = Math.random();
+              let b = Math.random();
+              let c = Math.random();
+              let d = Math.random();
 
-                let a = Math.random();
-                let b = Math.random();
-                let c = Math.random();
-                let d = Math.random();
-
-                await userDoc.set(
-                  {
-                    userWarCards: firebase.firestore.FieldValue.arrayUnion(
-                      {
-                        image: userFirstCard.image,
-                        value: userFirstCard.value,
-                        suit: userFirstCard.suit,
-                        code: userFirstCard.code,
-                        face_down: true,
-                        id: a
-                      },
-                      {
-                        image: userSecondCard.image,
-                        value: userSecondCard.value,
-                        suit: userSecondCard.suit,
-                        code: userSecondCard.code,
-                        id: b
-                      }
-                    ),
-                    cpuWarCards: firebase.firestore.FieldValue.arrayUnion(
-                      {
-                        image: cpuFirstCard.image,
-                        value: cpuFirstCard.value,
-                        suit: cpuFirstCard.suit,
-                        code: cpuFirstCard.code,
-                        face_down: true,
-                        id: c
-                      },
-                      {
-                        image: cpuSecondCard.image,
-                        value: cpuSecondCard.value,
-                        suit: cpuSecondCard.suit,
-                        code: cpuSecondCard.code,
-                        id: d
-                      }
-                    )
-                  },
-                  { merge: true }
-                );
-                //compare values of seconds cards
-
-                const doc = await userDoc.get();
-                const { cpuWarCards, userWarCards } = doc.data();
-
-                setWarCardArrays({ user: userWarCards, cpu: cpuWarCards });
-
-                let cpuCodesArr = [];
-                let userCodesArr = [];
-                cpuWarCards.map(item => cpuCodesArr.push(item.code));
-                userWarCards.map(item => userCodesArr.push(item.code));
-                let cpuCodes = cpuCodesArr.toString();
-                let userCodes = userCodesArr.toString();
-
-                let revealCpuCards = cpuWarCards.map(item => ({
-                  ...item,
-                  face_down: false
-                }));
-                let revealUserCards = userWarCards.map(item => ({
-                  ...item,
-                  face_down: false
-                }));
-
-                setTimeout(() => {
-                  if (
-                    cardValue(userSecondCard.value) ===
-                    cardValue(cpuSecondCard.value)
-                  ) {
-                    if (warAgainUserRemaining < 2) {
-                      return endOfGame("lose");
-                    } else if (warAgainCpuRemaining < 2) {
-                      return endOfGame("win");
+              await userDoc.set(
+                {
+                  userWarCards: firebase.firestore.FieldValue.arrayUnion(
+                    {
+                      image: userFirstCard.image,
+                      value: userFirstCard.value,
+                      suit: userFirstCard.suit,
+                      code: userFirstCard.code,
+                      face_down: true,
+                      id: a
+                    },
+                    {
+                      image: userSecondCard.image,
+                      value: userSecondCard.value,
+                      suit: userSecondCard.suit,
+                      code: userSecondCard.code,
+                      id: b
                     }
-                    showWarModal();
-                    warDraw();
-                  } else if (
-                    cardValue(userSecondCard.value) >
-                    cardValue(cpuSecondCard.value)
-                  ) {
-                    //send cards to user
+                  ),
+                  cpuWarCards: firebase.firestore.FieldValue.arrayUnion(
+                    {
+                      image: cpuFirstCard.image,
+                      value: cpuFirstCard.value,
+                      suit: cpuFirstCard.suit,
+                      code: cpuFirstCard.code,
+                      face_down: true,
+                      id: c
+                    },
+                    {
+                      image: cpuSecondCard.image,
+                      value: cpuSecondCard.value,
+                      suit: cpuSecondCard.suit,
+                      code: cpuSecondCard.code,
+                      id: d
+                    }
+                  )
+                },
+                { merge: true }
+              );
+              //compare values of seconds cards
 
-                    const userWin = async () => {
-                      setWarCardArrays({
-                        user: revealUserCards,
-                        cpu: revealCpuCards
-                      });
-                      try {
-                        const res = await axios.get(
-                          `${apiStart}/${id}/pile/${user_pile}/add/?cards=${bothCardCodes},${userCodes},${cpuCodes}`
+              const doc = await userDoc.get();
+              const { cpuWarCards, userWarCards } = doc.data();
+
+              setWarCardArrays({ user: userWarCards, cpu: cpuWarCards });
+
+              let cpuCodesArr = [];
+              let userCodesArr = [];
+              cpuWarCards.map(item => cpuCodesArr.push(item.code));
+              userWarCards.map(item => userCodesArr.push(item.code));
+              let cpuCodes = cpuCodesArr.toString();
+              let userCodes = userCodesArr.toString();
+
+              let revealCpuCards = cpuWarCards.map(item => ({
+                ...item,
+                face_down: false
+              }));
+              let revealUserCards = userWarCards.map(item => ({
+                ...item,
+                face_down: false
+              }));
+
+              setTimeout(() => {
+                if (
+                  cardValue(userSecondCard.value) ===
+                  cardValue(cpuSecondCard.value)
+                ) {
+                  warActions(
+                    warAgainUserRemaining,
+                    warAgainCpuRemaining,
+                    warDraw
+                  );
+                } else if (
+                  cardValue(userSecondCard.value) >
+                  cardValue(cpuSecondCard.value)
+                ) {
+                  //user wins war
+
+                  const userWin = async () => {
+                    setWarCardArrays({
+                      user: revealUserCards,
+                      cpu: revealCpuCards
+                    });
+                    try {
+                      const res = await axios.get(
+                        `${apiStart}/${id}/pile/${user_pile}/add/?cards=${bothCardCodes},${userCodes},${cpuCodes}`
+                      );
+                      setTimeout(() => {
+                        setCardsLeft({
+                          user: res.data.piles.user_pile.remaining,
+                          cpu: warAgainCpuRemaining
+                        });
+                        doStartAnimation({ ...startAnimation, userWon: true });
+                        afterWinActions(
+                          true,
+                          warAgainCpuRemaining,
+                          winningMessage
                         );
-                        setTimeout(() => {
-                          setCardsLeft({
-                            user: res.data.piles.user_pile.remaining,
-                            cpu: cpuWarDraw.data.piles.cpu_pile.remaining
-                          });
-                          doStartAnimation({ userWon: true, cpuWon: false });
-                          userDoc.delete().catch(() => alert(errorMessage));
-                          afterWinActions(true);
-                        }, 2000);
-                      } catch (err) {
-                        alert(err);
-                      }
-                    };
+                      }, 2000);
+                    } catch (err) {
+                      alert(err);
+                    }
+                  };
+                  setTimeout(() => {
+                    userWin();
+                  }, 1000);
+                } else if (
+                  cardValue(userSecondCard.value) <
+                  cardValue(cpuSecondCard.value)
+                ) {
+                  //cpu wins war
 
-                    setTimeout(() => {
-                      userWin();
-                    }, 1000);
-                  } else if (
-                    cardValue(userSecondCard.value) <
-                    cardValue(cpuSecondCard.value)
-                  ) {
-                    //send cards to cpu
-
-                    const cpuWin = async () => {
-                      setWarCardArrays({
-                        user: revealUserCards,
-                        cpu: revealCpuCards
-                      });
-                      try {
-                        const res = await axios.get(
-                          `${apiStart}/${id}/pile/${cpu_pile}/add/?cards=${bothCardCodes},${cpuCodes},${userCodes}`
+                  const cpuWin = async () => {
+                    setWarCardArrays({
+                      user: revealUserCards,
+                      cpu: revealCpuCards
+                    });
+                    try {
+                      const res = await axios.get(
+                        `${apiStart}/${id}/pile/${cpu_pile}/add/?cards=${bothCardCodes},${cpuCodes},${userCodes}`
+                      );
+                      setTimeout(() => {
+                        setCardsLeft({
+                          cpu: res.data.piles.cpu_pile.remaining,
+                          user: warAgainUserRemaining
+                        });
+                        doStartAnimation({ ...startAnimation, cpuWon: true });
+                        afterWinActions(
+                          true,
+                          warAgainUserRemaining,
+                          losingMessage
                         );
-                        setTimeout(() => {
-                          setCardsLeft({
-                            cpu: res.data.piles.cpu_pile.remaining,
-                            user: userWarDraw.data.piles.user_pile.remaining
-                          });
-                          doStartAnimation({ userWon: false, cpuWon: true });
-                          userDoc.delete().catch(() => alert(errorMessage));
-                          afterWinActions(true);
-                        }, 2000);
-                      } catch (err) {
-                        alert(err);
-                      }
-                    };
-                    setTimeout(() => {
-                      cpuWin();
-                    }, 1000);
-                  }
-                }, 2000);
-              } catch (err) {
-                alert(err);
-              }
-            }, 1000);
+                      }, 2000);
+                    } catch (err) {
+                      alert(err);
+                    }
+                  };
+                  setTimeout(() => {
+                    cpuWin();
+                  }, 1000);
+                }
+              }, 1700);
+            } catch (err) {
+              alert(err);
+            }
           };
 
-          warDraw();
+          warActions(userCardsRemaining, cpuCardsRemaining, warDraw);
         } else if (cardValue(userCards.value) > cardValue(cpuCards.value)) {
           //user card greater
           (async () => {
@@ -380,16 +400,14 @@ function App() {
               const res = await axios.get(
                 `${apiStart}/${id}/pile/${user_pile}/add/?cards=${bothCardCodes}`
               );
-              doStartAnimation({ userWon: true, cpuWon: false });
+              doStartAnimation({ ...startAnimation, userWon: true });
               setCardsLeft({
                 user: res.data.piles.user_pile.remaining,
                 cpu: cpuCardsRemaining
               });
 
-              afterWinActions();
-              setTimeout(() => {
-                if (cpuCardsRemaining < 1) return endOfGame("win");
-              }, 320);
+              afterWinActions(false, cpuCardsRemaining, winningMessage);
+              //  endOfGame(cpuCardsRemaining, winningMessage);
             } catch (err) {
               alert(err);
             }
@@ -401,15 +419,13 @@ function App() {
               const res = await axios.get(
                 `${apiStart}/${id}/pile/${cpu_pile}/add/?cards=${bothCardCodes}`
               );
-              doStartAnimation({ userWon: false, cpuWon: true });
+              doStartAnimation({ ...startAnimation, cpuWon: true });
               setCardsLeft({
                 user: userCardsRemaining,
                 cpu: res.data.piles.cpu_pile.remaining
               });
-              afterWinActions();
-              setTimeout(() => {
-                if (userCardsRemaining < 1) return endOfGame("lose");
-              }, 320);
+              afterWinActions(false, userCardsRemaining, losingMessage);
+              //   endOfGame(userCardsRemaining, losingMessage);
             } catch (err) {
               alert(err);
             }
@@ -420,35 +436,23 @@ function App() {
       alert(err);
     }
   };
-  const showGameVals = () => loggedIn && cardsLeft.user && cardsLeft.cpu;
-  const decksSet = () => !!cardsLeft.user || !!cardsLeft.cpu;
+  const decksNotSet = () => cardsLeft.user === null && cardsLeft.cpu === null;
+  const showGameVals = () => cardsLeft.user !== null && cardsLeft.cpu !== null;
+
   return (
     <>
       <GlobalStyle />
-
-      {decksSet() || <Instructions onStart={onGameStartTwo} />}
+      {decksNotSet() && (
+        <Instructions onStart={onStartGame} loading={loading} />
+      )}
       {showGameVals() && (
         <>
           <p>Deck: {cardsLeft.cpu}</p>
           <h2>CPU</h2>
-          <DrawnCard
-            showCard={cardDrawn.cpu}
-            src={cardDrawn.cpu.image}
-            alt={`${cardDrawn.cpu.value} of ${cardDrawn.cpu.suit}`}
-            cpuWonAnimation={startAnimation.cpuWon}
-            userWonAnimation={startAnimation.userWon}
-          />
-          <AllWarCards
-            startAnimation={startAnimation}
+          <AllCards
+            cardDrawn={cardDrawn}
             warCardArrays={warCardArrays}
-          />
-
-          <DrawnCard
-            showCard={cardDrawn.user}
-            src={cardDrawn.user.image}
-            alt={`${cardDrawn.user.value} of ${cardDrawn.user.suit}`}
-            cpuWonAnimation={startAnimation.cpuWon}
-            userWonAnimation={startAnimation.userWon}
+            startAnimation={startAnimation}
           />
           <h2>You</h2>
           <p>Deck: {cardsLeft.user}</p>

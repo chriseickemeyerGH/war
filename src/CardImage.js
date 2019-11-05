@@ -20,6 +20,9 @@ to {
 }`;
 
 const IMG = styled.img`
+  @media (max-width: 499px) {
+    height: 85px;
+  }
   height: 100px;
   animation-name: ${props =>
     props.cpuWonAnimation

@@ -5,6 +5,9 @@ import { CardImage } from "./CardImage";
 import { ImageDiv } from "./ImageDiv";
 
 const EmptyPic = styled.img`
+  @media (max-width: 499px) {
+    height: 85px;
+  }
   height: 100px;
   visibility: hidden;
 `;
