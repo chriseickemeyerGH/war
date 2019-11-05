@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { AllCards } from "./AllCards";
 import { GlobalStyle } from "./GlobalStyles";
 import { cardValue } from "./cardValue";
@@ -10,8 +10,6 @@ import { Instructions } from "./Instructions";
 import firebase from "./firebaseConfig";
 import axios from "axios";
 
-//add actions to end game if 0 cards left after war end
-
 function App() {
   const buttonRef = useRef(null);
   const [id, setID] = useState("");
@@ -21,7 +19,6 @@ function App() {
   const [userDoc, setUserDoc] = useState("");
   const [loggedIn, isLoggedIn] = useState(false);
   const [gameStart, triggerGameStart] = useState(false);
-  const [buttonFocus, setButtonFocus] = useState(false);
   const [drawDisabled, setDrawDisabled] = useState(false);
   const [showModal, doShowModal] = useState({
     warModal: false,
@@ -32,20 +29,13 @@ function App() {
     userWon: false,
     cpuWon: false
   });
-
   const [loading, isLoading] = useState(false);
+
   const apiStart = `https://deckofcardsapi.com/api/deck`;
   const errorMessage =
     "There's been an error. Please refresh the page or try again later.";
   const winningMessage = "win";
   const losingMessage = "lose";
-  const widthOver1000 = window.innerWidth > 1000;
-
-  useLayoutEffect(() => {
-    if (widthOver1000 && document.getElementById("DrawButton")) {
-      buttonRef.current.focus();
-    }
-  }, [buttonFocus, widthOver1000]);
 
   useEffect(() => {
     firebase.auth().onAuthStateChanged(user => {
@@ -62,10 +52,9 @@ function App() {
       }
     });
   }, []);
+  const widthOver1000 = window.innerWidth > 1000;
 
-  const focusOnButton = () => {
-    widthOver1000 && setButtonFocus(!buttonFocus);
-  };
+  const focusOnDrawButton = () => widthOver1000 && buttonRef.current.focus();
 
   const user_pile = "user_pile";
   const cpu_pile = "cpu_pile";
@@ -101,9 +90,7 @@ function App() {
       userDoc.delete().catch(() => alert(errorMessage));
       setCardDrawn({ user: "", cpu: "" });
       doStartAnimation({ userWon: false, cpuWon: false });
-      //   setDrawDisabled(false);
       warWin && setWarCardArrays({ user: [], cpu: [] });
-      //   focusOnButton();
       if (numberCardsLeft < 1) {
         return [
           doShowModal({ ...showModal, endGameModal: true }),
@@ -111,8 +98,7 @@ function App() {
         ];
       } else {
         setDrawDisabled(false);
-        let t = true;
-        t && focusOnButton();
+        focusOnDrawButton();
       }
     }, 310);
   };
@@ -142,7 +128,6 @@ function App() {
   };
 
   const onGameStartTwo = () => {
-    //  logUserIn();
     const createDecks = async () => {
       try {
         const res = await axios.get(`${apiStart}/new/draw/?count=52`);
@@ -170,8 +155,7 @@ function App() {
             cpu: cpu_deck.data.piles.cpu_pile.remaining
           });
           setDrawDisabled(false);
-
-          focusOnButton();
+          focusOnDrawButton();
         } catch (err) {
           alert(err);
         }
@@ -405,9 +389,7 @@ function App() {
                 user: res.data.piles.user_pile.remaining,
                 cpu: cpuCardsRemaining
               });
-
               afterWinActions(false, cpuCardsRemaining, winningMessage);
-              //  endOfGame(cpuCardsRemaining, winningMessage);
             } catch (err) {
               alert(err);
             }
@@ -425,7 +407,6 @@ function App() {
                 cpu: res.data.piles.cpu_pile.remaining
               });
               afterWinActions(false, userCardsRemaining, losingMessage);
-              //   endOfGame(userCardsRemaining, losingMessage);
             } catch (err) {
               alert(err);
             }
