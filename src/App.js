@@ -32,8 +32,7 @@ function App() {
   const [loading, isLoading] = useState(false);
 
   const apiStart = `https://deckofcardsapi.com/api/deck`;
-  const errorMessage =
-    "There's been an error. Please refresh the page or try again later.";
+
   const winningMessage = "win";
   const losingMessage = "lose";
 
@@ -60,10 +59,10 @@ function App() {
   const cpu_pile = "cpu_pile";
 
   const restartGame = () => {
-    userDoc.delete().catch(() => alert(errorMessage));
+    userDoc.delete().catch(err => onError(err));
     setWarCardArrays({ user: [], cpu: [] });
     setCardDrawn({ user: "", cpu: "" });
-    onGameStartTwo();
+    onGameStart();
     doShowModal({ ...showModal, endGameModal: false });
   };
 
@@ -75,19 +74,19 @@ function App() {
         .signInAnonymously()
         .then(() => {
           isLoading(false);
-          onGameStartTwo();
+          onGameStart();
         })
-        .catch(() => {
-          return alert(errorMessage);
+        .catch(err => {
+          onError(err);
         });
     } else if (loggedIn) {
-      onGameStartTwo();
+      onGameStart();
     }
   };
 
   const afterWinActions = (warWin, numberCardsLeft, resultText) => {
     setTimeout(() => {
-      userDoc.delete().catch(() => alert(errorMessage));
+      userDoc.delete().catch(err => onError(err));
       setCardDrawn({ user: "", cpu: "" });
       doStartAnimation({ userWon: false, cpuWon: false });
       warWin && setWarCardArrays({ user: [], cpu: [] });
@@ -127,7 +126,7 @@ function App() {
     }, 1200);
   };
 
-  const onGameStartTwo = () => {
+  const onGameStart = () => {
     const createDecks = async () => {
       try {
         const res = await axios.get(`${apiStart}/new/draw/?count=52`);
@@ -157,17 +156,21 @@ function App() {
           setDrawDisabled(false);
           focusOnDrawButton();
         } catch (err) {
-          alert(err);
+          onError(err);
         }
       } catch (err) {
-        alert(err);
+        onError(err);
       }
     };
     createDecks();
   };
 
+  const onError = err => {
+    alert(err);
+    setDrawDisabled(false);
+  };
   //draw from bottom
-  const onDrawTwo = async () => {
+  const onDraw = async () => {
     triggerGameStart(true);
     setDrawDisabled(true);
     try {
@@ -329,7 +332,7 @@ function App() {
                         );
                       }, 2000);
                     } catch (err) {
-                      alert(err);
+                      onError(err);
                     }
                   };
                   setTimeout(() => {
@@ -363,7 +366,7 @@ function App() {
                         );
                       }, 2000);
                     } catch (err) {
-                      alert(err);
+                      onError(err);
                     }
                   };
                   setTimeout(() => {
@@ -372,7 +375,7 @@ function App() {
                 }
               }, 1700);
             } catch (err) {
-              alert(err);
+              onError(err);
             }
           };
 
@@ -391,7 +394,7 @@ function App() {
               });
               afterWinActions(false, cpuCardsRemaining, winningMessage);
             } catch (err) {
-              alert(err);
+              onError(err);
             }
           })();
         } else if (cardValue(userCards.value) < cardValue(cpuCards.value)) {
@@ -408,13 +411,13 @@ function App() {
               });
               afterWinActions(false, userCardsRemaining, losingMessage);
             } catch (err) {
-              alert(err);
+              onError(err);
             }
           })();
         }
       }, 1600);
     } catch (err) {
-      alert(err);
+      onError(err);
     }
   };
   const decksNotSet = () => cardsLeft.user === null && cardsLeft.cpu === null;
@@ -440,7 +443,7 @@ function App() {
           <Button
             disabled={drawDisabled}
             id="DrawButton"
-            onClick={onDrawTwo}
+            onClick={onDraw}
             ref={buttonRef}
           >
             Draw
