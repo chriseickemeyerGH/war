@@ -387,6 +387,8 @@ function App() {
               const res = await axios.get(
                 `${apiStart}/${id}/pile/${user_pile}/add/?cards=${bothCardCodes}`
               );
+              console.log("animation running");
+
               doStartAnimation({ ...startAnimation, userWon: true });
               setCardsLeft({
                 user: res.data.piles.user_pile.remaining,
@@ -404,6 +406,7 @@ function App() {
               const res = await axios.get(
                 `${apiStart}/${id}/pile/${cpu_pile}/add/?cards=${bothCardCodes}`
               );
+              console.log("animation running");
               doStartAnimation({ ...startAnimation, cpuWon: true });
               setCardsLeft({
                 user: userCardsRemaining,
