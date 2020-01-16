@@ -1,4 +1,3 @@
-import React from "react";
 import styled, { keyframes, css } from "styled-components";
 
 const slideUp = keyframes`
@@ -19,7 +18,7 @@ to {
     opacity: 0
 }`;
 
-const IMG = styled.img`
+export const CardImage = styled.img`
   @media (max-width: 499px) {
     height: 85px;
   }
@@ -42,5 +41,3 @@ const IMG = styled.img`
   animation-direction: normal;
   animation-fill-mode: forwards;
 `;
-
-export const CardImage = ({ ...props }) => <IMG {...props} />;

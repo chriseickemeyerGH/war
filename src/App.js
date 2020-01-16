@@ -423,16 +423,14 @@ function App() {
       onError(err);
     }
   };
-  const decksNotSet = () => cardsLeft.user === null && cardsLeft.cpu === null;
-  const showGameVals = () => cardsLeft.user !== null && cardsLeft.cpu !== null;
+  const decksNotSet = cardsLeft.user === null && cardsLeft.cpu === null;
+  const showGameVals = cardsLeft.user !== null && cardsLeft.cpu !== null;
 
   return (
     <>
       <GlobalStyle />
-      {decksNotSet() && (
-        <Instructions onStart={onStartGame} loading={loading} />
-      )}
-      {showGameVals() && (
+      {decksNotSet && <Instructions onStart={onStartGame} loading={loading} />}
+      {showGameVals && (
         <>
           <p>Deck: {cardsLeft.cpu}</p>
           <h2>CPU</h2>

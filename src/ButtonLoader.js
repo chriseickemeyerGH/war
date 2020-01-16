@@ -1,4 +1,3 @@
-import React from "react";
 import styled, { keyframes } from "styled-components";
 const Spinning = keyframes`
  0% {
@@ -9,7 +8,7 @@ const Spinning = keyframes`
   }
 `;
 
-const Ring = styled.div`
+export const ButtonLoader = styled.div`
   display: inline-block;
   width: 12px;
   height: 12px;
@@ -29,5 +28,3 @@ const Ring = styled.div`
     animation: ${Spinning} 1s linear infinite;
   }
 `;
-
-export const ButtonLoader = () => <Ring />;
