@@ -33,8 +33,8 @@ function App() {
 
   const apiStart = `https://deckofcardsapi.com/api/deck`;
 
-  const winningMessage = "win";
-  const losingMessage = "lose";
+  const winningMessage = "win",
+    losingMessage = "lose";
 
   useEffect(() => {
     firebase.auth().onAuthStateChanged(user => {
@@ -55,8 +55,8 @@ function App() {
 
   const focusOnDrawButton = () => widthOver1000 && buttonRef.current.focus();
 
-  const user_pile = "user_pile";
-  const cpu_pile = "cpu_pile";
+  const user_pile = "user_pile",
+    cpu_pile = "cpu_pile";
 
   const restartGame = () => {
     userDoc.delete().catch(err => onError(err));
@@ -131,13 +131,13 @@ function App() {
       try {
         const res = await axios.get(`${apiStart}/new/draw/?count=52`);
         /* draw all cards from new deck */
-        let deck_id = res.data.deck_id;
+        const deck_id = res.data.deck_id;
         setID(deck_id);
-        let cards = res.data.cards;
-        let arr = [];
+        const cards = res.data.cards;
+        const arr = [];
         cards.map(item => arr.push(item.code));
-        let userStartingDeck = splitDeck(arr, 0, 26);
-        let cpuStartingDeck = splitDeck(arr, 26, 52);
+        const userStartingDeck = splitDeck(arr, 0, 26),
+          cpuStartingDeck = splitDeck(arr, 26, 52);
 
         try {
           const [user_deck, cpu_deck] = await Promise.all([
@@ -174,16 +174,16 @@ function App() {
     triggerGameStart(true);
     setDrawDisabled(true);
     try {
-      let drawCard = "draw/bottom/?count=1";
+      const drawCard = "draw/bottom/?count=1";
       const [userDraw, cpuDraw] = await Promise.all([
         axios.get(`${apiStart}/${id}/pile/${user_pile}/${drawCard}`),
         axios.get(`${apiStart}/${id}/pile/${cpu_pile}/${drawCard}`)
       ]);
 
-      let userCards = userDraw.data.cards[0];
-      let cpuCards = cpuDraw.data.cards[0];
-      let userCardsRemaining = userDraw.data.piles.user_pile.remaining;
-      let cpuCardsRemaining = cpuDraw.data.piles.cpu_pile.remaining;
+      const userCards = userDraw.data.cards[0],
+        cpuCards = cpuDraw.data.cards[0],
+        userCardsRemaining = userDraw.data.piles.user_pile.remaining,
+        cpuCardsRemaining = cpuDraw.data.piles.cpu_pile.remaining;
 
       setCardsLeft({
         user: userCardsRemaining,
@@ -201,36 +201,36 @@ function App() {
           suit: cpuCards.suit
         }
       });
-      let bothCardCodes = `${userCards.code},${cpuCards.code}`;
+      const bothCardCodes = `${userCards.code},${cpuCards.code}`;
 
       setTimeout(() => {
         if (cardValue(userCards.value) === cardValue(cpuCards.value)) {
           //firstwar
           const warDraw = async () => {
             try {
-              let drawTwo = "draw/bottom/?count=2";
+              const drawTwo = "draw/bottom/?count=2";
               const [userWarDraw, cpuWarDraw] = await Promise.all([
                 axios.get(`${apiStart}/${id}/pile/${user_pile}/${drawTwo}`),
                 axios.get(`${apiStart}/${id}/pile/${cpu_pile}/${drawTwo}`)
               ]);
-              let userData = userWarDraw.data;
-              let cpuData = cpuWarDraw.data;
-              let warAgainUserRemaining = userData.piles.user_pile.remaining;
-              let warAgainCpuRemaining = cpuData.piles.cpu_pile.remaining;
+              const userData = userWarDraw.data,
+                cpuData = cpuWarDraw.data,
+                warAgainUserRemaining = userData.piles.user_pile.remaining,
+                warAgainCpuRemaining = cpuData.piles.cpu_pile.remaining;
               setCardsLeft({
                 user: warAgainUserRemaining,
                 cpu: warAgainCpuRemaining
               });
               const drawnCards = (fnData, num) => fnData.cards[num];
-              let userFirstCard = drawnCards(userData, 0);
-              let userSecondCard = drawnCards(userData, 1);
-              let cpuFirstCard = drawnCards(cpuData, 0);
-              let cpuSecondCard = drawnCards(cpuData, 1);
+              const userFirstCard = drawnCards(userData, 0),
+                userSecondCard = drawnCards(userData, 1),
+                cpuFirstCard = drawnCards(cpuData, 0),
+                cpuSecondCard = drawnCards(cpuData, 1);
 
-              let a = Math.random();
-              let b = Math.random();
-              let c = Math.random();
-              let d = Math.random();
+              const a = Math.random(),
+                b = Math.random(),
+                c = Math.random(),
+                d = Math.random();
 
               await userDoc.set(
                 {
@@ -278,18 +278,19 @@ function App() {
 
               setWarCardArrays({ user: userWarCards, cpu: cpuWarCards });
 
-              let cpuCodesArr = [];
-              let userCodesArr = [];
-              cpuWarCards.map(item => cpuCodesArr.push(item.code));
-              userWarCards.map(item => userCodesArr.push(item.code));
-              let cpuCodes = cpuCodesArr.toString();
-              let userCodes = userCodesArr.toString();
+              const cpuCodesArr = [],
+                userCodesArr = [],
+                cpuCodes = cpuCodesArr.toString(),
+                userCodes = userCodesArr.toString();
 
-              let revealCpuCards = cpuWarCards.map(item => ({
+              cpuWarCards.forEach(item => cpuCodesArr.push(item.code));
+              userWarCards.forEach(item => userCodesArr.push(item.code));
+
+              const revealCpuCards = cpuWarCards.map(item => ({
                 ...item,
                 face_down: false
               }));
-              let revealUserCards = userWarCards.map(item => ({
+              const revealUserCards = userWarCards.map(item => ({
                 ...item,
                 face_down: false
               }));
@@ -423,8 +424,8 @@ function App() {
       onError(err);
     }
   };
-  const decksNotSet = cardsLeft.user === null && cardsLeft.cpu === null;
-  const showGameVals = cardsLeft.user !== null && cardsLeft.cpu !== null;
+  const decksNotSet = cardsLeft.user === null && cardsLeft.cpu === null,
+    showGameVals = cardsLeft.user !== null && cardsLeft.cpu !== null;
 
   return (
     <>
