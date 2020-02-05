@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { AllCards } from "./AllCards";
 import { GlobalStyle } from "./GlobalStyles";
 import { cardValue } from "./cardValue";
 import { splitDeck } from "./splitDeck";
@@ -7,6 +6,7 @@ import { WarModal } from "./WarModal";
 import { EndGameModal } from "./EndGameModal";
 import { Button } from "./Button";
 import { Instructions } from "./Instructions";
+import { GameTable } from "./GameTable";
 import firebase from "./firebaseConfig";
 import axios from "axios";
 
@@ -79,9 +79,7 @@ function App() {
         .catch(err => {
           onError(err);
         });
-    } else if (loggedIn) {
-      onGameStart();
-    }
+    } else onGameStart();
   };
 
   const afterWinActions = (warWin, numberCardsLeft, resultText) => {
@@ -139,25 +137,21 @@ function App() {
         const userStartingDeck = splitDeck(arr, 0, 26),
           cpuStartingDeck = splitDeck(arr, 26, 52);
 
-        try {
-          const [user_deck, cpu_deck] = await Promise.all([
-            axios.get(
-              `${apiStart}/${deck_id}/pile/${user_pile}/add/?cards=${userStartingDeck}`
-            ),
-            axios.get(
-              `${apiStart}/${deck_id}/pile/${cpu_pile}/add/?cards=${cpuStartingDeck}`
-            )
-          ]);
+        const [user_deck, cpu_deck] = await Promise.all([
+          axios.get(
+            `${apiStart}/${deck_id}/pile/${user_pile}/add/?cards=${userStartingDeck}`
+          ),
+          axios.get(
+            `${apiStart}/${deck_id}/pile/${cpu_pile}/add/?cards=${cpuStartingDeck}`
+          )
+        ]);
 
-          setCardsLeft({
-            user: user_deck.data.piles.user_pile.remaining,
-            cpu: cpu_deck.data.piles.cpu_pile.remaining
-          });
-          setDrawDisabled(false);
-          focusOnDrawButton();
-        } catch (err) {
-          onError(err);
-        }
+        setCardsLeft({
+          user: user_deck.data.piles.user_pile.remaining,
+          cpu: cpu_deck.data.piles.cpu_pile.remaining
+        });
+        setDrawDisabled(false);
+        focusOnDrawButton();
       } catch (err) {
         onError(err);
       }
@@ -432,29 +426,24 @@ function App() {
       <GlobalStyle />
       {decksNotSet && <Instructions onStart={onStartGame} loading={loading} />}
       {showGameVals && (
-        <>
-          <p>Deck: {cardsLeft.cpu}</p>
-          <h2>CPU</h2>
-          <AllCards
-            cardDrawn={cardDrawn}
-            warCardArrays={warCardArrays}
-            startAnimation={startAnimation}
-          />
-          <h2>You</h2>
-          <p>Deck: {cardsLeft.user}</p>
-          <Button
-            disabled={drawDisabled}
-            id="DrawButton"
-            onClick={onDraw}
-            ref={buttonRef}
-          >
-            Draw
-          </Button>
-
-          {!gameStart && widthOver1000 && (
-            <p>Click or Press "Enter" / "Space" to draw</p>
-          )}
-        </>
+        <GameTable
+          cardsLeft={cardsLeft}
+          cardDrawn={cardDrawn}
+          warCardArrays={warCardArrays}
+          startAnimation={startAnimation}
+          drawButton={
+            <Button
+              disabled={drawDisabled}
+              id="DrawButton"
+              onClick={onDraw}
+              ref={buttonRef}
+            >
+              Draw
+            </Button>
+          }
+          gameStart={gameStart}
+          widthOver1000={widthOver1000}
+        />
       )}
       <WarModal startAnimation={showModal.warModal} />
       <EndGameModal
