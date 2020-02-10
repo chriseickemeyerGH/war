@@ -221,11 +221,6 @@ function App() {
                 cpuFirstCard = drawnCards(cpuData, 0),
                 cpuSecondCard = drawnCards(cpuData, 1);
 
-              const a = Math.random(),
-                b = Math.random(),
-                c = Math.random(),
-                d = Math.random();
-
               await userDoc.set(
                 {
                   userWarCards: firebase.firestore.FieldValue.arrayUnion(
@@ -235,14 +230,14 @@ function App() {
                       suit: userFirstCard.suit,
                       code: userFirstCard.code,
                       face_down: true,
-                      id: a
+                      id: `${userFirstCard.value} of ${userFirstCard.suit}`
                     },
                     {
                       image: userSecondCard.image,
                       value: userSecondCard.value,
                       suit: userSecondCard.suit,
                       code: userSecondCard.code,
-                      id: b
+                      id: `${userSecondCard.value} of ${userSecondCard.suit}`
                     }
                   ),
                   cpuWarCards: firebase.firestore.FieldValue.arrayUnion(
@@ -252,14 +247,14 @@ function App() {
                       suit: cpuFirstCard.suit,
                       code: cpuFirstCard.code,
                       face_down: true,
-                      id: c
+                      id: `${cpuFirstCard.value} of ${cpuFirstCard.suit}`
                     },
                     {
                       image: cpuSecondCard.image,
                       value: cpuSecondCard.value,
                       suit: cpuSecondCard.suit,
                       code: cpuSecondCard.code,
-                      id: d
+                      id: `${cpuSecondCard.value} of ${cpuSecondCard.suit}`
                     }
                   )
                 },

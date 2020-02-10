@@ -14,7 +14,7 @@ export const WarCards = ({ array, cpuWonAnimation, userWonAnimation }) => (
             userWonAnimation={userWonAnimation}
             key={item.id}
             src={item.face_down ? PlayingCard : item.image}
-            alt={`${item.value} of ${item.suit}`}
+            alt={item.id}
           />
         ))}
       </ImageDiv>
