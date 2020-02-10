@@ -84,10 +84,14 @@ function App() {
 
   const afterWinActions = (warWin, numberCardsLeft, resultText) => {
     setTimeout(() => {
-      userDoc.delete().catch(err => onError(err));
+      if (warWin) {
+        userDoc.delete().catch(err => onError(err));
+        setWarCardArrays({ user: [], cpu: [] });
+      }
+
       setCardDrawn({ user: "", cpu: "" });
       doStartAnimation({ userWon: false, cpuWon: false });
-      warWin && setWarCardArrays({ user: [], cpu: [] });
+
       if (numberCardsLeft < 1) {
         return [
           doShowModal({ ...showModal, endGameModal: true }),
