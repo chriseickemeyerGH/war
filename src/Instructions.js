@@ -1,7 +1,6 @@
 import React from "react";
 import styled from "styled-components";
 import { Button } from "./Button";
-import { ButtonLoader } from "./ButtonLoader";
 
 const CenterButton = styled.div`
   text-align: center;
@@ -55,7 +54,7 @@ export const Instructions = ({ onStart, loading }) => (
       Source
     </SourceLink>
     <CenterButton>
-      <Button onClick={onStart}> {loading && <ButtonLoader />} Start</Button>
+      <Button onClick={onStart}>Start</Button>
     </CenterButton>
   </InstructionDiv>
 );
