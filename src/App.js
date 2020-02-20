@@ -73,17 +73,17 @@ function App() {
     setTimeout(() => {
       doShowModal({ ...showModal, warModal: false });
     }, 1100);
+
     setTimeout(() => {
+      const outOfCards = message => {
+        doShowModal({ warModal: false, endGameModal: true });
+        setResult(message);
+      };
+
       if (user_cards_left < 2) {
-        return [
-          doShowModal({ warModal: false, endGameModal: true }),
-          setResult(losingMessage)
-        ];
+        return outOfCards(losingMessage);
       } else if (cpu_cards_left < 2) {
-        return [
-          doShowModal({ warModal: false, endGameModal: true }),
-          setResult(winningMessage)
-        ];
+        return outOfCards(winningMessage);
       } else {
         setTimeout(() => {
           warCardsFn();
